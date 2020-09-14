@@ -1,4 +1,6 @@
 
+from __future__ import division
+from __future__ import absolute_import
 def yc(params, gamma_m, gamma_cs, gamma_self, givenYT=None, debug=False):
     from numpy import zeros, arange
     # Save computation time by giving YT if you have already computed it.

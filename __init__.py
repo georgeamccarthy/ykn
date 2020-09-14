@@ -1,2 +1,2 @@
 
-from ykn import *
+from .ykn import *
