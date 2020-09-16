@@ -26,7 +26,8 @@ def yc(params, gamma_m, gamma_cs, gamma_self, givenYT=None, debug=False):
     Yc_valid = zeros(shape=(9,len_t))
     gamma_c = zeros(shape=(9, len_t))
     gamma_chat = zeros(shape=(9, len_t))
-    gamma_cvalid = zeros(shape=(9, len_t))
+    if debug == True:
+        gammacvalid = zeros(shape=(9, len_t))
     Yc_rules = zeros(shape=(9, len_t))
     Yc_result = zeros(len_t)
 
@@ -118,8 +119,8 @@ def yc(params, gamma_m, gamma_cs, gamma_self, givenYT=None, debug=False):
 
     if debug == True:
         for i in arange(9):
-            gamma_c_valid[i] = gamma_c[i] * Yc_rules[i]
-        return (Yc_result, Yc, Yc_valid, Yc_rules, gamma_c, gamma_chat, gamma_c_valid)
+            gammacvalid[i] = gamma_c[i] * Yc_rules[i]
+        return (Yc_result, Yc, Yc_valid, Yc_rules, gamma_c, gamma_chat, gammacvalid)
 
     return Yc_result
 
@@ -188,3 +189,15 @@ def YT_slow_approx(params, gamma_m, gamma_cs, t_2_row):
     elif t_2_row == 3:
         return inner_term
 
+# Y* as given in JBH A11
+def YT_transition(params):
+    p = params.p
+    E_ratio = params.e_e / params.e_b
+    return ((1 + 4 * p / (p - 1) * E_ratio) ** (1 / 2) - 1) / 2
+
+def fs_transtime(params, gammam, gammacs, t):
+    from numpy import where
+    YTfast = YT_fast(params, gammam, gammacs)
+    valid_slow = where(YTfast < YT_transition(params))
+    transtime_index = max(valid_slow[0])
+    return t[transtime_index]
