@@ -116,6 +116,40 @@ def yc(params, gamma_m, gamma_cs, gamma_self, givenYT=None, debug=False):
     for i in arange(9):
         Yc_valid[i] = Yc[i] * Yc_rules[i]
         Yc_result = Yc_result + Yc_valid[i]
+    # FIXME fixes small gaps between valid regions at late times, giving
+    # a valid Y there. Breaks early times, ultra fast cooling not valid.
+    Yc_result = Yc_result + (Yc_result == 0) * YT
+
+    # TODO remove gaps by setting blanks to YT if it's the nearset valid Yc.
+    '''
+    zeros = (Yc_result == 0)
+    for i in arange(len_t):
+        if zeros[i] == 1:
+            z_index = i
+            if i != 0:
+                for j in arange(len_t):
+                    for k in arange(9):
+                        if Yc_rules[k][z_index - j] != 0:
+                            lower_nonz_case = k
+                            break
+                    break
+            else:
+                lower_nonz_case = 999
+            if i != len_t:
+                for j in arange(len_t):
+                    for k in arange(9):
+                        if z_index + j >= len_t:
+                            pass
+                        elif Yc_rules[k][z_index + j] != 0:
+                            upper_nonz_case = k
+                            break
+            else:
+                upper_nonz_case = 999
+            #if lower_nonz_case == 0 or lower_nonz_case == 4 or upper_nonz_case == 0 or upper_nonz_case == 4:
+            if upper_nonz_case == 4:
+                    print("test")
+                    Yc_result[z_index] = YT[z_index]
+    '''
 
     if debug == True:
         for i in arange(9):
