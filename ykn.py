@@ -1,11 +1,100 @@
 
+# Backwards compatibility with python 2.
 from __future__ import division
 from __future__ import absolute_import
-def yc(params, gamma_m, gamma_cs, gamma_self, givenYT=None, debug=False):
+
+def y(params, gammam, gammacs, gammaself, gammae, givenYT=None, givenYc=None, debug=False):
+    from numpy import zeros, arange
+    # Save computation time by giving YT & Yc if you have already computed them.
+    if givenYT is None:
+        YT = yt(params, gammam, gammacs)
+    else:
+        YT = givenYT
+    if givenYc is None:
+        Yc = yc(params, gammam, gammacs, gammaself, YT)
+    else:
+        Yc = givenYc
+
+    p = params.p
+    len_t = len(gammam)
+
+    Y = zeros(shape=((6, len_t)))
+    Y_rules = zeros(shape=((6, len_t)))
+    Y_valid = zeros(shape=((6, len_t)))
+    Y_result = zeros(len_t)
+
+    gammamhat = get_gammahat(gammaself, gammam)
+    gammacshat = get_gammahat(gammaself, gammacs)
+
+    gammac = gammacs / (1 + Yc)
+    gammachat = get_gammahat(gammaself, gammac)
+
+    Y[0] = YT
+    Y[1] = YT * (gammae / gammamhat) ** (-1 / 2)
+    Y[2] = (YT * (gammac / gammam) * (gammae / gammachat)
+        ** (-4 / 3))
+    Y[3] = YT
+    Y[4] = YT * (gammae / gammachat) ** ((p - 3) / 2)
+    Y[5] = (
+        YT
+        * (gammamhat / gammachat) ** ((p - 3) / 2)
+        * (gammae / gammamhat) ** (-4 / 3)
+    )
+
+    Y_rules[0] = (
+    (gammac < gammam)
+    & (gammae < gammamhat)
+    )
+    Y_rules[1] = (
+        (gammac < gammam)
+        & (gammamhat < gammae)
+        & (gammae < gammachat)
+    )
+    Y_rules[2] = (
+        (gammac < gammam)
+        & (gammachat < gammae)
+    )
+    Y_rules[3] = (
+        (gammam < gammac)
+        & (gammae < gammachat)
+    )
+    Y_rules[4] = (
+        (gammam < gammac)
+        & (gammachat < gammae)
+        & (gammae < gammamhat)
+
+    )
+    Y_rules[5] = (
+        (gammam < gammac)
+        & (gammamhat < gammae)
+    )
+
+    for i in arange(6):
+        Y_valid[i] = Y[i] * Y_rules[i]
+
+    Y_result = sum(Y_valid)
+
+    if debug == True:
+        return (
+            Y_result,
+            Y,
+            Y_valid,
+            Y_rules,
+            Yc_result,
+            Yc,
+            Yc_valid,
+            Yc_rules,
+            gammac,
+            gammachat
+        )
+
+    return Y_result
+
+def yc(params, gammam, gammacs, gamma_self, givenYT=None, debug=False):
     from numpy import zeros, arange
     # Save computation time by giving YT if you have already computed it.
     if givenYT is None:
-        YT = yt(params, gamma_m, gamma_cs)
+        YT = yt(params, gammam, gammacs)
     else:
         YT = givenYT
 
@@ -13,99 +102,98 @@ def yc(params, gamma_m, gamma_cs, gamma_self, givenYT=None, debug=False):
     e_b = params.e_b
     p = params.p
 
-    gamma_mhat = get_gammahat(gamma_self, gamma_m)
-    gamma_cshat = get_gammahat(gamma_self, gamma_cs)
+    gammamhat = get_gammahat(gamma_self, gammam)
+    gammacshat = get_gammahat(gamma_self, gammacs)
 
     # Make compatible with t as float
-    if isinstance(gamma_m, float):
+    if isinstance(gammam, float):
         len_t = 1
     else:
-        len_t = len(gamma_m)
+        len_t = len(gammam)
 
     Yc = zeros(shape=(9, len_t))
     Yc_valid = zeros(shape=(9,len_t))
-    gamma_c = zeros(shape=(9, len_t))
-    gamma_chat = zeros(shape=(9, len_t))
-    if debug == True:
-        gammacvalid = zeros(shape=(9, len_t))
+    gammac = zeros(shape=(9, len_t))
+    gammachat = zeros(shape=(9, len_t))
+
     Yc_rules = zeros(shape=(9, len_t))
     Yc_result = zeros(len_t)
 
     # Compute Yc in each functional regime.
     Yc[0] = YT
-    Yc[1] = YT ** 2 * (gamma_cs / gamma_mhat) ** -1
-    Yc[2] = YT * (gamma_cs / gamma_mhat) ** (-1 / 2)
-    Yc[3] = YT * gamma_cs ** -1 * gamma_mhat ** (1 / 2)
+    Yc[1] = YT ** 2 * (gammacs / gammamhat) ** -1
+    Yc[2] = YT * (gammacs / gammamhat) ** (-1 / 2)
+    Yc[3] = YT * gammacs ** -1 * gammamhat ** (1 / 2)
     Yc[4] = YT
     inner_term = (
-        e_e
-        / (e_b * (3 - p))
-        * (gamma_m / gamma_cs) ** (p - 2)
-        * (gamma_cs / gamma_cshat) ** ((p - 3) / 2)
+        e_e / e_b
+        * 1 / (3 - p)
+        * (gammam / gammacs) ** (p - 2)
+        * (gammacs / gammacshat) ** ((p - 3) / 2)
     )
     Yc[5] = inner_term ** (2 / (p - 1))
     Yc[6] = inner_term
     inner_term = (
-        e_e
-        / (e_b * (3 - p))
-        * (gamma_m / gamma_mhat) ** (-4 / 3)
-        * (gamma_m / gamma_cshat) ** (7 / 3)
+        e_e / e_b
+        * 1 / (3 - p)
+        * (gammam / gammamhat) ** (-4 / 3)
+        * (gammam / gammacshat) ** (7 / 3)
     )
     Yc[7] = inner_term ** (3 / 7)
     Yc[8] = inner_term
 
     # For each Yc compute the corresponding gammac and gammachat
     for i in arange(len(Yc)):
-        gamma_c[i] = gamma_cs / (1 + Yc[i])
-        gamma_chat[i] = get_gammahat(gamma_self, gamma_c[i])
+        gammac[i] = gammacs / (1 + Yc[i])
+        gammachat[i] = get_gammahat(gamma_self, gammac[i])
 
     # Yc_rules = 1 where each Yc obeys its own rules and = 0 where it does not.
     Yc_rules[0] = (
-        (gamma_c[0] < gamma_m)
-        & (gamma_c[0] < gamma_mhat)
+        (gammac[0] < gammam)
+        & (gammac[0] < gammamhat)
     )
     Yc_rules[1] = (
-        (gamma_c[1] < gamma_m)
-        & (gamma_mhat < gamma_c[1])
-        & (gamma_c[1] < gamma_chat[1])
+        (gammac[1] < gammam)
+        & (gammamhat < gammac[1])
+        & (gammac[1] < gammachat[1])
         & (Yc[1] >= 1)
     )
     Yc_rules[2] = (
-        (gamma_c[2] < gamma_m)
-        & (gamma_mhat < gamma_c[2])
-        & (gamma_c[2] < gamma_chat[2])
+        (gammac[2] < gammam)
+        & (gammamhat < gammac[2])
+        & (gammac[2] < gammachat[2])
         & (Yc[2] < 1)
     )
     Yc_rules[3] = (
-        (gamma_c[3] < gamma_m)
-        & (gamma_chat[3] < gamma_c[3])
+        (gammac[3] < gammam)
+        & (gammachat[3] < gammac[3])
     )
     Yc_rules[4] = (
-        (gamma_m < gamma_c[4])
-        & (gamma_c[4] < gamma_chat[4])
+        (gammam < gammac[4])
+        & (gammac[4] < gammachat[4])
     )
     Yc_rules[5] = (
-        (gamma_m < gamma_c[5])
-        & (gamma_chat[5] < gamma_c[5])
-        & (gamma_c[5] < gamma_mhat)
+        (gammam < gammac[5])
+        & (gammachat[5] < gammac[5])
+        & (gammac[5] < gammamhat)
         & (Yc[5] >= 1)
     )
     Yc_rules[6] = (
-        (gamma_m < gamma_c[6])
-        & (gamma_chat[6] < gamma_c[6])
-        & (gamma_c[6] < gamma_mhat)
+        (gammam < gammac[6])
+        & (gammachat[6] < gammac[6])
+        & (gammac[6] < gammamhat)
         & (Yc[6] < 1)
     )
     Yc_rules[7] = (
-        (gamma_m < gamma_c[7])
-        & (gamma_chat[7] < gamma_mhat)
-        & (gamma_mhat < gamma_c[7])
+        (gammam < gammac[7])
+        & (gammachat[7] < gammamhat)
+        & (gammamhat < gammac[7])
         & (Yc[7] >= 1)
     )
     Yc_rules[8] = (
-        (gamma_m < gamma_c[8])
-        & (gamma_chat[8] < gamma_mhat)
-        & (gamma_mhat < gamma_c[8])
+        (gammam < gammac[8])
+        & (gammachat[8] < gammamhat)
+        & (gammamhat < gammac[8])
         & (Yc[8] < 1)
     )
     # Remove any overlaps.
@@ -119,6 +207,8 @@ def yc(params, gamma_m, gamma_cs, gamma_self, givenYT=None, debug=False):
     # FIXME fixes small gaps between valid regions at late times, giving
     # a valid Y there. Breaks early times, ultra fast cooling not valid.
     Yc_result = Yc_result + (Yc_result == 0) * YT
+    if debug == False:
+        return Yc_result
 
     # TODO remove gaps by setting blanks to YT if it's the nearset valid Yc.
     '''
@@ -152,9 +242,10 @@ def yc(params, gamma_m, gamma_cs, gamma_self, givenYT=None, debug=False):
     '''
 
     if debug == True:
+        gammacvalid = zeros(shape=(9, len_t))
         for i in arange(9):
-            gammacvalid[i] = gamma_c[i] * Yc_rules[i]
-        return (Yc_result, Yc, Yc_valid, Yc_rules, gamma_c, gamma_chat, gammacvalid)
+            gammacvalid[i] = gammac[i] * Yc_rules[i]
+        return (Yc_result, Yc, Yc_valid, Yc_rules, gammac, gammachat, gammacvalid)
 
     return Yc_result
 
@@ -162,26 +253,25 @@ def yc(params, gamma_m, gamma_cs, gamma_self, givenYT=None, debug=False):
 def get_gammahat(gamma_self, gamma):
     return gamma_self ** 3 / gamma ** 2
 
-def yt(params, gamma_m, gamma_cs):
+def yt(params, gammam, gammacs):
     p = params.p
     # Alpha as seen in JBH Eq.13 for smoothing.
     a = -60 * p ** -2
     return (
-        YT_fast(params, gamma_m, gamma_cs) ** a
-        + YT_slow(params, gamma_m, gamma_cs) ** a
+        YT_fast(params, gammam, gammacs) ** a
+        + YT_slow(params, gammam, gammacs) ** a
     ) ** (1 / a)
 
 
 # Solves A7 by passing coeffs of A7 to cubic_formula()
-def YT_fast(params, gamma_m, gamma_cs):
+def YT_fast(params, gammam, gammacs):
     p = params.p
     E_ratio = params.e_e / params.e_b
-
-    gamma_cs_over_m = gamma_cs / gamma_m + 0j
+    gammacsover_m = gammacs / gammam + 0j
     a = 1
-    b = 2 - (p - 1) / p * gamma_cs_over_m
-    c = 1 - E_ratio - (p - 1) / p * gamma_cs_over_m
-    d = E_ratio * ((p - 2) / (p - 1) * gamma_cs_over_m - 1)
+    b = 2 - (p - 1) / p * gammacsover_m
+    c = 1 - E_ratio - (p - 1) / p * gammacsover_m
+    d = E_ratio * ((p - 2) / (p - 1) * gammacsover_m - 1)
     return cubic_formula(a, b, c, d)
 
 
@@ -201,21 +291,21 @@ def cubic_formula(a, b, c, d):
 
 # Computes Y Thomson in the slow regime by smoothing between the approximations
 # in JBH Tab.2.
-def YT_slow(params, gamma_m, gamma_cs):
+def YT_slow(params, gammam, gammacs):
     p = params.p
     # FIXME YMMV with this smoothing constant. 
     # Works well for JBH Fig.1 & Fig.1 parameters.
     a = - 1.7
-    return (YT_slow_approx(params, gamma_m, gamma_cs, 2) ** a +
-            YT_slow_approx(params, gamma_m, gamma_cs, 3) ** a) ** (1 / a)
+    return (YT_slow_approx(params, gammam, gammacs, 2) ** a +
+            YT_slow_approx(params, gammam, gammacs, 3) ** a) ** (1 / a)
 
 
 # Returns an approximation for Y_slow as given in table 2 of JBH.
 # t_2_row is the row number of the approximation in the table.
-def YT_slow_approx(params, gamma_m, gamma_cs, t_2_row):
+def YT_slow_approx(params, gammam, gammacs, t_2_row):
     p = params.p
     E_ratio = params.e_e / params.e_b
-    inner_term = E_ratio / (3 - p) * (gamma_m / gamma_cs) ** (p - 2)
+    inner_term = E_ratio / (3 - p) * (gammam / gammacs) ** (p - 2)
     # Analytic solution gives approximation for large Y.
     if t_2_row == 2:
         return inner_term ** (1 / (4 - p))
