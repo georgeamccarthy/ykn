@@ -139,7 +139,7 @@ def yc(params, gammam, gammacs, gamma_self, givenYT=None, debug=False):
             len_q = gammam.shape[1]
             nineshape = (9, len_t, len_q)
             yc_shape = (len_t, len_q)
-            YT = array([YT for i in arange(len_q)]).transpose()
+            #YT = array([YT for i in arange(len_q)]).transpose()
 
     Yc = zeros(nineshape)
     Yc_valid = zeros(nineshape)
