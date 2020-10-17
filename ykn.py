@@ -15,17 +15,34 @@ def y(params, gammam, gammacs, gammaself, gammae, givenYT=None, givenYc=None, de
     else:
         Yc = givenYc
 
-    p = params.p
-    len_t = len(gammam)
+    # Return float if input gammas are a single data point of type float.
+    if isinstance(gammam, float):
+        len_t = 1
+        six_shape = (6, len_t)
+        y_shape = len_t
+    # Return 1d array if input gammas are 1d array.
+    elif isinstance(gammam, ndarray):
+        if gammam.ndim == 1:
+            len_t = len(gammam)
+            six_shape = (6, len_t)
+            y_shape = len_t
+        # Return 2d array if input gammas are 2d array.
+        elif gammam.ndim == 2:
+            len_t = gammam.shape[0]
+            len_q = gammam.shape[1]
+            six_shape = (6, len_t, len_q)
+            y_shape = (len_t, len_q)
+            YT = array([YT for i in arange(len_q)]).transpose()
 
-    Y = zeros(shape=((6, len_t)))
-    Y_rules = zeros(shape=((6, len_t)))
-    Y_valid = zeros(shape=((6, len_t)))
-    Y_result = zeros(len_t)
+    p = params.p
+
+    Y = zeros(six_shape)
+    Y_rules = zeros(six_shape)
+    Y_valid = zeros(six_shape)
+    Y_result = zeros(y_shape)
 
     gammamhat = get_gammahat(gammaself, gammam)
     gammacshat = get_gammahat(gammaself, gammacs)
-
     gammac = gammacs / (1 + Yc)
     gammachat = get_gammahat(gammaself, gammac)
 
@@ -91,7 +108,7 @@ def y(params, gammam, gammacs, gammaself, gammae, givenYT=None, givenYc=None, de
     return Y_result
 
 def yc(params, gammam, gammacs, gamma_self, givenYT=None, debug=False):
-    from numpy import zeros, arange
+    from numpy import zeros, arange, ndarray, array
     # Save computation time by giving YT if you have already computed it.
     if givenYT is None:
         YT = yt(params, gammam, gammacs)
@@ -105,19 +122,31 @@ def yc(params, gammam, gammacs, gamma_self, givenYT=None, debug=False):
     gammamhat = get_gammahat(gamma_self, gammam)
     gammacshat = get_gammahat(gamma_self, gammacs)
 
-    # Make compatible with t as float
+    # Return float if input gammas are a single data point of type float.
     if isinstance(gammam, float):
         len_t = 1
-    else:
-        len_t = len(gammam)
+        nineshape = (9, len_t)
+        yc_shape = len_t
+    # Return 1d array if input gammas are 1d array.
+    elif isinstance(gammam, ndarray):
+        if gammam.ndim == 1:
+            len_t = len(gammam)
+            nineshape = (9, len_t)
+            yc_shape = len_t
+        # Return 2d array if input gammas are 2d array.
+        elif gammam.ndim == 2:
+            len_t = gammam.shape[0]
+            len_q = gammam.shape[1]
+            nineshape = (9, len_t, len_q)
+            yc_shape = (len_t, len_q)
+            YT = array([YT for i in arange(len_q)]).transpose()
 
-    Yc = zeros(shape=(9, len_t))
-    Yc_valid = zeros(shape=(9,len_t))
-    gammac = zeros(shape=(9, len_t))
-    gammachat = zeros(shape=(9, len_t))
-
-    Yc_rules = zeros(shape=(9, len_t))
-    Yc_result = zeros(len_t)
+    Yc = zeros(nineshape)
+    Yc_valid = zeros(nineshape)
+    gammac = zeros(nineshape)
+    gammachat = zeros(nineshape)
+    Yc_rules = zeros(nineshape)
+    Yc_result = zeros(yc_shape)
 
     # Compute Yc in each functional regime.
     Yc[0] = YT
