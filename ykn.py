@@ -4,7 +4,7 @@ from __future__ import division
 from __future__ import absolute_import
 
 def y(params, gammam, gammacs, gammaself, gammae, givenYT=None, givenYc=None, debug=False):
-    from numpy import zeros, arange
+    from numpy import zeros, arange, ndarray
     # Save computation time by giving YT & Yc if you have already computed them.
     if givenYT is None:
         YT = yt(params, gammam, gammacs)
@@ -335,8 +335,11 @@ def YT_slow_approx(params, gammam, gammacs, t_2_row):
     p = params.p
     E_ratio = params.e_e / params.e_b
     inner_term = E_ratio / (3 - p) * (gammam / gammacs) ** (p - 2)
+    #print(inner_term)
     # Analytic solution gives approximation for large Y.
     if t_2_row == 2:
+        #print(1/(4-p))
+        #print(inner_term ** (1 / (4 - p)))
         return inner_term ** (1 / (4 - p))
     # Analytic solution gives approximation for small Y.
     elif t_2_row == 3:
