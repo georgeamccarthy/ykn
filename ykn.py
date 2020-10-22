@@ -228,6 +228,7 @@ def yc(params, gammam, gammacs, gamma_self, givenYT=None, debug=False):
     # Remove any overlaps.
     # YT takes priority as their are fewer approximations for YT.
     Yc_rules[5][Yc_rules[4] == 1] = 0
+    Yc_rules[6][Yc_rules[4] == 1] = 0
     Yc_rules[1][Yc_rules[1] == (Yc_rules[0] == 1)] = 0
 
     for i in arange(9):
