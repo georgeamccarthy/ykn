@@ -109,38 +109,48 @@ def y(params, gammam, gammacs, gammaself, gammae, givenYT=None, givenYc=None, de
 
 def yc(params, gammam, gammacs, gamma_self, givenYT=None, debug=False):
     from numpy import zeros, arange, ndarray, array
-    # Save computation time by giving YT if you have already computed it.
-    if givenYT is None:
-        YT = yt(params, gammam, gammacs)
-    else:
-        YT = givenYT
 
     e_e = params.e_e
     e_b = params.e_b
     p = params.p
 
-    gammamhat = get_gammahat(gamma_self, gammam)
-    gammacshat = get_gammahat(gamma_self, gammacs)
 
     # Return float if input gammas are a single data point of type float.
     if isinstance(gammam, float):
+        dims = 0
         len_t = 1
-        nineshape = (9, len_t)
-        yc_shape = len_t
     # Return 1d array if input gammas are 1d array.
     elif isinstance(gammam, ndarray):
         if gammam.ndim == 1:
+            # Results in Yc returned as 1D array.
+            dims = 1
             len_t = len(gammam)
-            nineshape = (9, len_t)
-            yc_shape = len_t
         # Return 2d array if input gammas are 2d array.
         elif gammam.ndim == 2:
+            # Results in Yc returned as 2D array.
+            dims = 2
             len_t = gammam.shape[0]
             len_q = gammam.shape[1]
-            nineshape = (9, len_t, len_q)
-            yc_shape = (len_t, len_q)
-            #YT = array([YT for i in arange(len_q)]).transpose()
+            # Slice gammas to 1D arrays because for Yc they are degenerate
+            # in frequency.
+            gammam = gammam[:,0]
+            gammacs = gammacs[:,0]
+            gamma_self = gamma_self[:,0]
 
+    # Save computation time by giving YT if you have already computed it.
+    if givenYT is None:
+        YT = yt(params, gammam, gammacs)
+    else:
+        if dims == 2:
+            YT = givenYT[:,0]
+        else:
+            YT = givenYT
+
+    gammamhat = get_gammahat(gamma_self, gammam)
+    gammacshat = get_gammahat(gamma_self, gammacs)
+
+    nineshape = (9, len_t)
+    yc_shape = len_t
     Yc = zeros(nineshape)
     Yc_valid = zeros(nineshape)
     gammac = zeros(nineshape)
@@ -237,7 +247,10 @@ def yc(params, gammam, gammacs, gamma_self, givenYT=None, debug=False):
     # FIXME fixes small gaps between valid regions at late times, giving
     # a valid Y there. Breaks early times, ultra fast cooling not valid.
     Yc_result = Yc_result + (Yc_result == 0) * YT
+
     if debug == False:
+        if dims == 2:
+            return array([Yc_result for i in arange(len_q)]).transpose()
         return Yc_result
 
     # TODO remove gaps by setting blanks to YT if it's the nearset valid Yc.
@@ -277,21 +290,35 @@ def yc(params, gammam, gammacs, gamma_self, givenYT=None, debug=False):
             gammacvalid[i] = gammac[i] * Yc_rules[i]
         return (Yc_result, Yc, Yc_valid, Yc_rules, gammac, gammachat, gammacvalid)
 
-    return Yc_result
-
-
 def get_gammahat(gamma_self, gamma):
     return gamma_self ** 3 / gamma ** 2
 
 def yt(params, gammam, gammacs):
+    from numpy import ndarray, array, arange
+
     p = params.p
+
+    dims = 0
+    if isinstance(gammam, ndarray):
+        if gammam.ndim == 2:
+            dims = 2
+            len_t = gammam.shape[0]
+            len_q = gammam.shape[1]
+            gammam = gammam[:,0]
+            gammacs = gammacs[:,0]
+
     # Alpha as seen in JBH Eq.13 for smoothing.
     a = -60 * p ** -2
-    return (
+
+    YT = (
         YT_fast(params, gammam, gammacs) ** a
         + YT_slow(params, gammam, gammacs) ** a
     ) ** (1 / a)
 
+    if dims == 2:
+        return array([YT for i in arange(len_q)]).transpose()
+
+    return YT
 
 # Solves A7 by passing coeffs of A7 to cubic_formula()
 def YT_fast(params, gammam, gammacs):
