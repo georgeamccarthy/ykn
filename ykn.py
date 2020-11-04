@@ -5,15 +5,6 @@ from __future__ import absolute_import
 
 def y(params, gammam, gammacs, gammaself, gammae, givenYT=None, givenYc=None, debug=False):
     from numpy import zeros, arange, ndarray
-    # Save computation time by giving YT & Yc if you have already computed them.
-    if givenYT is None:
-        YT = yt(params, gammam, gammacs)
-    else:
-        YT = givenYT
-    if givenYc is None:
-        Yc = yc(params, gammam, gammacs, gammaself, YT)
-    else:
-        Yc = givenYc
 
     # Return float if input gammas are a single data point of type float.
     if isinstance(gammam, float):
@@ -33,6 +24,22 @@ def y(params, gammam, gammacs, gammaself, gammae, givenYT=None, givenYc=None, de
             six_shape = (6, len_t, len_q)
             y_shape = (len_t, len_q)
             YT = array([YT for i in arange(len_q)]).transpose()
+
+    # Save computation time by giving YT & Yc if you have already computed them.
+    if givenYT is None:
+        YT = yt(params, gammam, gammacs)
+    else:
+        if dims == 2:
+            YT = givenYT[:,0]
+        else:
+            YT = givenYT
+    if givenYc is None:
+        Yc = yc(params, gammam, gammacs, gammaself, YT)
+    else:
+        if dims == 2:
+            Yc = givenYc[:,0]
+        else:
+            Yc = givenYc
 
     p = params.p
 
@@ -97,10 +104,7 @@ def y(params, gammam, gammacs, gammaself, gammae, givenYT=None, givenYc=None, de
             Y,
             Y_valid,
             Y_rules,
-            Yc_result,
             Yc,
-            Yc_valid,
-            Yc_rules,
             gammac,
             gammachat
         )
