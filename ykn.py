@@ -4,7 +4,7 @@ from __future__ import division
 from __future__ import absolute_import
 
 def y(params, gammam, gammacs, gammaself, gammae, givenYT=None, givenYc=None, debug=False):
-    from numpy import zeros, arange, ndarray
+    from numpy import zeros, arange, ndarray, array
 
     # Return float if input gammas are a single data point of type float.
     if isinstance(gammam, float):
@@ -23,7 +23,6 @@ def y(params, gammam, gammacs, gammaself, gammae, givenYT=None, givenYc=None, de
             len_q = gammam.shape[1]
             six_shape = (6, len_t, len_q)
             y_shape = (len_t, len_q)
-            YT = array([YT for i in arange(len_q)]).transpose()
 
     # Save computation time by giving YT & Yc if you have already computed them.
     if givenYT is None:
