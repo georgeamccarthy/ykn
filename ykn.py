@@ -7,18 +7,22 @@ def y(params, gammam, gammacs, gammaself, gammae, givenYT=None, givenYc=None, de
     from numpy import zeros, arange, ndarray, array
 
     # Return float if input gammas are a single data point of type float.
-    if isinstance(gammam, float):
-        len_t = 1
-        six_shape = (6, len_t)
-        y_shape = len_t
+    if isinstance(gammae, float):
+        dims = 0
+        len_tq = 1
+        six_shape = (6, len_tq)
+        y_shape = len_tq
     # Return 1d array if input gammas are 1d array.
-    elif isinstance(gammam, ndarray):
-        if gammam.ndim == 1:
-            len_t = len(gammam)
-            six_shape = (6, len_t)
-            y_shape = len_t
+    elif isinstance(gammae, ndarray):
+        if gammae.ndim == 1:
+            dims = 1
+            # If 1d array, we don't know if time of freq space.
+            len_tq = len(gammae)
+            six_shape = (6, len_tq)
+            y_shape = len_tq
         # Return 2d array if input gammas are 2d array.
-        elif gammam.ndim == 2:
+        elif gammae.ndim == 2:
+            dims = 2
             len_t = gammam.shape[0]
             len_q = gammam.shape[1]
             six_shape = (6, len_t, len_q)
