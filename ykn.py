@@ -9,6 +9,7 @@ def y(params, gammam, gammacs, gammaself, gammae, givenYT=None, givenYc=None, de
     # Return float if input gammas are a single data point of type float.
     if isinstance(gammae, float):
         dims = 0
+        # For a 1D array, dimension can be time of frequency.
         len_tq = 1
         six_shape = (6, len_tq)
         y_shape = len_tq
@@ -51,11 +52,13 @@ def y(params, gammam, gammacs, gammaself, gammae, givenYT=None, givenYc=None, de
     Y_valid = zeros(six_shape)
     Y_result = zeros(y_shape)
 
+    # Compute gammahats.
     gammamhat = get_gammahat(gammaself, gammam)
     gammacshat = get_gammahat(gammaself, gammacs)
     gammac = gammacs / (1 + Yc)
     gammachat = get_gammahat(gammaself, gammac)
 
+    # Compute Y for 6 orderings of the critical lorentz factors.
     Y[0] = YT
     Y[1] = YT * (gammae / gammamhat) ** (-1 / 2)
     Y[2] = (YT * (gammac / gammam) * (gammae / gammachat)
@@ -68,6 +71,9 @@ def y(params, gammam, gammacs, gammaself, gammae, givenYT=None, givenYc=None, de
         * (gammae / gammamhat) ** (-4 / 3)
     )
 
+    # Compute boundaries for each of the 6 Y parameters.
+    # Y_rules[i] = 1 where Y[i] has its conditions on the critical
+    # lorentz factors satisfied.
     Y_rules[0] = (
     (gammac < gammam)
     & (gammae < gammamhat)
@@ -101,6 +107,8 @@ def y(params, gammam, gammacs, gammaself, gammae, givenYT=None, givenYc=None, de
 
     Y_result = sum(Y_valid)
 
+    # Returns extra information for plotting, diagnostics and debugging if
+    # debug parameter is true.
     if debug == True:
         return (
             Y_result,
@@ -242,12 +250,9 @@ def yc(params, gammam, gammacs, gamma_self, givenYT=None, debug=False):
         & (gammamhat < gammac[8])
         & (Yc[8] < 1)
     )
-    # Remove any overlaps.
-    # YT takes priority as their are fewer approximations for YT.
-    """
-    Yc_rules[5][Yc_rules[4] == 1] = 0
-    Yc_rules[6][Yc_rules[4] == 1] = 0
-    """
+
+    # TODO Remove early time patch for correct fast regime results.
+    # This patch removes discontinuities but invalidates fast regime results.
     Yc_rules[1][Yc_rules[1] == (Yc_rules[0] == 1)] = 0
 
     for i in arange(9):
@@ -262,46 +267,17 @@ def yc(params, gammam, gammacs, gamma_self, givenYT=None, debug=False):
             return array([Yc_result for i in arange(len_q)]).transpose()
         return Yc_result
 
-    # TODO remove gaps by setting blanks to YT if it's the nearset valid Yc.
-    '''
-    zeros = (Yc_result == 0)
-    for i in arange(len_t):
-        if zeros[i] == 1:
-            z_index = i
-            if i != 0:
-                for j in arange(len_t):
-                    for k in arange(9):
-                        if Yc_rules[k][z_index - j] != 0:
-                            lower_nonz_case = k
-                            break
-                    break
-            else:
-                lower_nonz_case = 999
-            if i != len_t:
-                for j in arange(len_t):
-                    for k in arange(9):
-                        if z_index + j >= len_t:
-                            pass
-                        elif Yc_rules[k][z_index + j] != 0:
-                            upper_nonz_case = k
-                            break
-            else:
-                upper_nonz_case = 999
-            #if lower_nonz_case == 0 or lower_nonz_case == 4 or upper_nonz_case == 0 or upper_nonz_case == 4:
-            if upper_nonz_case == 4:
-                    print("test")
-                    Yc_result[z_index] = YT[z_index]
-    '''
-
     if debug == True:
         gammacvalid = zeros(shape=(9, len_t))
         for i in arange(9):
             gammacvalid[i] = gammac[i] * Yc_rules[i]
         return (Yc_result, Yc, Yc_valid, Yc_rules, gammac, gammachat, gammacvalid)
 
+# Compute gammahat.
 def get_gammahat(gamma_self, gamma):
     return gamma_self ** 3 / gamma ** 2
 
+# Compute Y Thomson given p, gammam and gammacs.
 def yt(params, gammam, gammacs):
     from numpy import ndarray, array, arange
 
@@ -388,6 +364,8 @@ def YT_transition(params):
     E_ratio = params.e_e / params.e_b
     return ((1 + 4 * p / (p - 1) * E_ratio) ** (1 / 2) - 1) / 2
 
+# Computes the transition time between fast and slow regimes in the Thomson
+# regime. Useful for plotting.
 def fs_transtime(params, gammam, gammacs, t):
     from numpy import where
     YTfast = YT_fast(params, gammam, gammacs)
