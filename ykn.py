@@ -7,7 +7,7 @@ def y(params, gammam, gammacs, gammaself, gammae, givenYT=None, givenYc=None, de
     from numpy import zeros, arange, ndarray, array
 
     # Return float if input gammas are a single data point of type float.
-    if isinstance(gammae, float):
+    if isinstance(gammae, float) or isinstance(gammae, int):
         dims = 0
         # For a 1D array, dimension can be time of frequency.
         len_tq = 1
