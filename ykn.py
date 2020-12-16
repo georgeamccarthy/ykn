@@ -129,9 +129,8 @@ def yc(params, gammam, gammacs, gamma_self, givenYT=None, debug=False):
     e_b = params.e_b
     p = params.p
 
-
     # Return float if input gammas are a single data point of type float.
-    if isinstance(gammam, float):
+    if isinstance(gammam, float) or isinstance(gammam, int):
         dims = 0
         len_t = 1
     # Return 1d array if input gammas are 1d array.
@@ -151,6 +150,9 @@ def yc(params, gammam, gammacs, gamma_self, givenYT=None, debug=False):
             gammam = gammam[:,0]
             gammacs = gammacs[:,0]
             gamma_self = gamma_self[:,0]
+    else:
+        raise Warning('Unsupported types for one or more gamma arguments.')
+
 
     # Save computation time by giving YT if you have already computed it.
     if givenYT is None:
