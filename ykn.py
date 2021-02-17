@@ -3,14 +3,16 @@
 from __future__ import division
 from __future__ import absolute_import
 
-# Returns gammac, the critical cooling lorentz factor and gammachat.
-def get_gammac_gammachat(params, gammam, gammacs, gammaself):
+# Returns gammac, the critical cooling lorentz factor and gammachat and Yc.
+def get_gammac(params, gammam, gammacs, gammaself):
     # Approximate gammac using yc.
-    gammac = gammacs / (1 + yc(params, gammam, gammacs, gammaself))
+    Yc = yc(params, gammam, gammacs, gammaself)
+    gammac = gammacs / (1 + Yc)
     # Plug gammae = gammac into y for correct Yc and then recompute gammac.
-    gammac = gammacs / (1 + y(params, gammam, gammacs, gammaself, gammac))
+    Yc = y(params, gammam, gammacs, gammaself, gammac)
+    gammac = gammacs / (1 + Yc)
     gammachat = get_gammahat(gammaself, gammac)
-    return gammac, gammachat
+    return gammac, gammachat, Yc
 
 def y(params, gammam, gammacs, gammaself, gammae, givenYT=None, givenYc=None, debug=False):
     from numpy import zeros, arange, ndarray, array
