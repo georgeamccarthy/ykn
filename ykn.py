@@ -371,6 +371,26 @@ def YT_slow_approx(params, gammam, gammacs, t_2_row):
     elif t_2_row == 3:
         return inner_term
 
+# JBH A15 solved numerically for exact YT_slow.
+def YT_slow_exact(params, gammam, gammacs):
+    from numpy import arange, zeros
+    from scipy.optimize import fsolve
+    p = params.p
+    E_ratio = params.e_e / params.e_b
+    YT = zeros(len(gammam))
+
+    def A15(YT):
+        return (YT*(1 + YT) ** 2 * (p * (1 + YT) ** (1 - p) - gamma_m_over_cs ** (p - 1))
+                - p * E_ratio * (gamma_m_over_cs * (1 + YT) ** (3 - p) *
+                (p - 2)/(p - 3) + 1/(3 - p) * gamma_m_over_cs ** (p - 2)))
+
+    for i in arange(len(gammam)):
+        starting_guess = YT_slow_approx(params, gammam[i], gammacs[i], 2)
+        gamma_m_over_cs = float(gammam[i] / gammacs[i])
+        YT[i] = float(fsolve(A15, starting_guess))
+
+    return YT
+
 # Y* as given in JBH A11
 def YT_transition(params):
     p = params.p
