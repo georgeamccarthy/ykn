@@ -23,7 +23,7 @@ def get_yc(params, gammam, gammacs, gammaself):
     Yc = y(params, gammam, gammacs, gammaself, gammac)
     return Yc
 
-def y(params, gammam, gammacs, gammaself, gammae, givenYT=None, givenYc=None, debug=False):
+def y(params, gammam, gammacs, gammaself, gammae, YT=None, Yc=None, debug=False):
     from numpy import zeros, arange, ndarray, array
 
     # Return float if input gammas are a single data point of type float.
@@ -50,20 +50,11 @@ def y(params, gammam, gammacs, gammaself, gammae, givenYT=None, givenYc=None, de
             y_shape = (len_t, len_q)
 
     # Save computation time by giving YT & Yc if you have already computed them.
-    if givenYT is None:
+    if YT is None:
         YT = yt(params, gammam, gammacs)
-    else:
-        if dims == 2:
-            YT = givenYT[:,0]
-        else:
-            YT = givenYT
-    if givenYc is None:
+
+    if Yc is None:
         Yc = yc(params, gammam, gammacs, gammaself, YT)
-    else:
-        if dims == 2:
-            Yc = givenYc[:,0]
-        else:
-            Yc = givenYc
 
     p = params.p
 
@@ -142,7 +133,7 @@ def y(params, gammam, gammacs, gammaself, gammae, givenYT=None, givenYc=None, de
 
     return Y_result
 
-def yc(params, gammam, gammacs, gamma_self, givenYT=None, debug=False):
+def yc(params, gammam, gammacs, gamma_self, YT=None, debug=False):
     from numpy import zeros, arange, ndarray, array
 
     e_e = params.e_e
@@ -173,15 +164,9 @@ def yc(params, gammam, gammacs, gamma_self, givenYT=None, debug=False):
     else:
         raise Warning('Unsupported types for one or more gamma arguments.')
 
-
     # Save computation time by giving YT if you have already computed it.
-    if givenYT is None:
+    if YT is None:
         YT = yt(params, gammam, gammacs)
-    else:
-        if dims == 2:
-            YT = givenYT[:,0]
-        else:
-            YT = givenYT
 
     gammamhat = get_gammahat(gamma_self, gammam)
     gammacshat = get_gammahat(gamma_self, gammacs)
@@ -197,7 +182,7 @@ def yc(params, gammam, gammacs, gamma_self, givenYT=None, debug=False):
 
     # Compute Yc in each functional regime.
     Yc[0] = YT
-    Yc[1] = YT ** 2 * (gammacs / gammamhat) ** -1
+    Yc[1] = YT ** (2/3) * (gammacs / gammamhat) ** (-1/3)
     Yc[2] = YT * (gammacs / gammamhat) ** (-1 / 2)
     Yc[3] = YT * gammacs ** -1 * gammamhat ** (1 / 2)
     Yc[4] = YT
@@ -209,13 +194,18 @@ def yc(params, gammam, gammacs, gamma_self, givenYT=None, debug=False):
     )
     Yc[5] = inner_term ** (2 / (p - 1))
     Yc[6] = inner_term
+    inner_term = e_e/(e_b*(3-p)) * (gammam/gammacs)**((3*p-7)/2) * (gammamhat/gammacshat)**((3*p-1)/6)
+    """
     inner_term = (
         e_e / e_b
         * 1 / (3 - p)
         * (gammam / gammamhat) ** (-4 / 3)
         * (gammam / gammacshat) ** (7 / 3)
     )
-    Yc[7] = inner_term ** (3 / 7)
+    Yc[7] = inner_term ** (3/7)
+    """
+    Yc[7] = inner_term ** (3 / 13)
+   
     Yc[8] = inner_term
 
     # For each Yc compute the corresponding gammac and gammachat
@@ -275,14 +265,14 @@ def yc(params, gammam, gammacs, gamma_self, givenYT=None, debug=False):
 
     # TODO Remove early time patch for correct fast regime results.
     # This patch removes discontinuities but invalidates fast regime results.
-    Yc_rules[1][Yc_rules[1] == (Yc_rules[0] == 1)] = 0
+    #Yc_rules[1][Yc_rules[1] == (Yc_rules[0] == 1)] = 0
 
     for i in arange(9):
         Yc_valid[i] = Yc[i] * Yc_rules[i]
         Yc_result = Yc_result + Yc_valid[i]
     # FIXME fixes small gaps between valid regions at late times, giving
     # a valid Y there. Breaks early times, ultra fast cooling not valid.
-    Yc_result = Yc_result + (Yc_result == 0) * YT
+    #Yc_result = Yc_result + (Yc_result == 0) * YT
 
     if debug == False:
         if dims == 2:
