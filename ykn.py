@@ -1,4 +1,3 @@
-
 # Backwards compatibility with python 2.
 from __future__ import division
 from __future__ import absolute_import
@@ -14,7 +13,7 @@ def get_gammac_gammachat_Yc(params, gammam, gammacs, gammaself):
     gammachat = get_gammahat(gammaself, gammac)
     return gammac, gammachat, Yc
 
-# Gets Yc by plugging gammae = gammac_approx into ykn.y
+# Gets Yc by plugging gammae = gammac_approx into ykn.y
 def get_yc(params, gammam, gammacs, gammaself):
     # Approximate gammac using yc.
     Yc = yc(params, gammam, gammacs, gammaself)
@@ -273,6 +272,9 @@ def yc(params, gammam, gammacs, gamma_self, YT=None, debug=False):
     for i in arange(9):
         Yc_valid[i] = Yc[i] * Yc_rules[i]
         Yc_result = Yc_result + Yc_valid[i]
+
+    # Fills gaps between valid regions with Y Thomson.
+    Yc_result = Yc_result + (Yc_result == 0) * YT
 
     if debug == False:
         if dims == 2:
