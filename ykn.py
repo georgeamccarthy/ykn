@@ -243,6 +243,7 @@ def yc(params, gammam, gammacs, gamma_self, YT=None, debug=False):
     Yc_rules[4] = (
         (gammam < gammac[4])
         & (gammac[4] < gammachat[4])
+        & (Yc[4] < 1)
     )
     Yc_rules[5] = (
         (gammam < gammac[5])
