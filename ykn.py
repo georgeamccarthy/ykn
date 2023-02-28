@@ -3,26 +3,30 @@ from __future__ import division
 from __future__ import absolute_import
 
 # Returns gammac, the critical cooling lorentz factor and gammachat and Yc.
-def get_gammac_gammachat_Yc(params, gammam, gammacs, gammaself):
+def get_gammac_gammachat_yc(params, gammam, gammacs, gamma_self, recursions=10):
     # Approximate gammac using yc.
-    Yc = yc(params, gammam, gammacs, gammaself)
-    gammac = gammacs / (1 + Yc)
-    # Plug gammae = gammac into y for correct Yc and then recompute gammac.
-    Yc = y(params, gammam, gammacs, gammaself, gammac)
-    gammac = gammacs / (1 + Yc)
-    gammachat = get_gammahat(gammaself, gammac)
+    Yc = yc(params, gammam, gammacs, gamma_self)
+
+    # These get reused.
+    gammamhat = get_gammahat(gamma_self, gammam)
+    YT = yt(params, gammam, gammacs)
+
+    # Iteratively generate Yc approximations and update gammac.
+    for _ in range(recursions):
+        # Plug gammae = gammac into y for correct Yc and then recompute gammac.
+        gammac = gammacs / (1 + Yc)
+        gammachat = get_gammahat(gamma_self, gammac)
+        Yc = y(params, gammam, gammac, gammamhat, gammachat, gammac, YT)
+
     return gammac, gammachat, Yc
 
-# Gets Yc by plugging gammae = gammac_approx into ykn.y
-def get_yc(params, gammam, gammacs, gammaself):
-    # Approximate gammac using yc.
-    Yc = yc(params, gammam, gammacs, gammaself)
-    gammac = gammacs / (1 + Yc)
-    # Plug gammae = gammac into y for correct Yc and then recompute gammac.
-    Yc = y(params, gammam, gammacs, gammaself, gammac)
-    return Yc
 
-def y(params, gammam, gammacs, gammaself, gammae, YT=None, Yc=None, debug=False):
+def get_yc(params, gammam, gammacs, gamma_self):
+    _, _, Yc = get_gammac_gammachat_yc(params, gammam, gammacs, gamma_self)
+    return Yc
+    
+
+def y(params, gammam, gammac, gammamhat, gammachat, gammae, YT, debug=False):
     from numpy import zeros, arange, ndarray, array
 
     # Return float if input gammas are a single data point of type float.
@@ -48,25 +52,12 @@ def y(params, gammam, gammacs, gammaself, gammae, YT=None, Yc=None, debug=False)
             six_shape = (6, len_t, len_q)
             y_shape = (len_t, len_q)
 
-    # Save computation time by giving YT & Yc if you have already computed them.
-    if YT is None:
-        YT = yt(params, gammam, gammacs)
-        
-    if Yc is None:
-        Yc = yc(params, gammam, gammacs, gammaself, YT)
-
     p = params.p
 
     Y = zeros(six_shape)
     Y_rules = zeros(six_shape)
     Y_valid = zeros(six_shape)
     Y_result = zeros(y_shape)
-
-    # Compute gammahats.
-    gammamhat = get_gammahat(gammaself, gammam)
-    gammacshat = get_gammahat(gammaself, gammacs)
-    gammac = gammacs / (1 + Yc)
-    gammachat = get_gammahat(gammaself, gammac)
 
     # Compute Y for 6 orderings of the critical lorentz factors.
     Y[0] = YT
@@ -125,7 +116,6 @@ def y(params, gammam, gammacs, gammaself, gammae, YT=None, Yc=None, debug=False)
             Y,
             Y_valid,
             Y_rules,
-            Yc,
             gammac,
             gammachat
         )
