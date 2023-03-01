@@ -2,29 +2,6 @@
 from __future__ import division
 from __future__ import absolute_import
 
-# Returns gammac, the critical cooling lorentz factor and gammachat and Yc.
-def get_gammac_gammachat_yc(params, gammam, gammacs, gamma_self, recursions=10):
-    # Approximate gammac using yc.
-    Yc = yc(params, gammam, gammacs, gamma_self)
-
-    # These get reused.
-    gammamhat = get_gammahat(gamma_self, gammam)
-    YT = yt(params, gammam, gammacs)
-
-    # Iteratively generate Yc approximations and update gammac.
-    for _ in range(recursions):
-        # Plug gammae = gammac into y for correct Yc and then recompute gammac.
-        gammac = gammacs / (1 + Yc)
-        gammachat = get_gammahat(gamma_self, gammac)
-        Yc = y(params, gammam, gammac, gammamhat, gammachat, gammac, YT)
-
-    return gammac, gammachat, Yc
-
-
-def get_yc(params, gammam, gammacs, gamma_self):
-    _, _, Yc = get_gammac_gammachat_yc(params, gammam, gammacs, gamma_self)
-    return Yc
-    
 
 def y(params, gammam, gammac, gammamhat, gammachat, gammae, YT, debug=False):
     from numpy import zeros, arange, ndarray, array
@@ -122,7 +99,8 @@ def y(params, gammam, gammac, gammamhat, gammachat, gammae, YT, debug=False):
 
     return Y_result
 
-def yc(params, gammam, gammacs, gamma_self, YT=None, debug=False):
+
+def yc_approx(params, gammam, gammacs, gamma_self, YT=None, debug=False):
     from numpy import zeros, arange, ndarray, array
 
     e_e = params.e_e
@@ -193,16 +171,6 @@ def yc(params, gammam, gammacs, gamma_self, YT=None, debug=False):
     )
     Yc[7] = inner_term ** (3 / 7)
     Yc[8] = inner_term
-    
-    # Alternative equations
-    """
-    inner_term =    e_e / e_b
-                    * 1 / (3 - p)
-                    * (gammam / gammacs) ** ((3*p - 7) / 2)
-                    * (gammamhat / gammacshat) ** ((3*p - 1) / 6)
-    Yc[7] = inner_term ** (3 / 13)
-    Yc[8] = inner_term
-    """
 
     # For each Yc compute the corresponding gammac and gammachat
     for i in arange(len(Yc)):
@@ -278,9 +246,11 @@ def yc(params, gammam, gammacs, gamma_self, YT=None, debug=False):
             gammacvalid[i] = gammac[i] * Yc_rules[i]
         return (Yc_result, Yc, Yc_valid, Yc_rules, gammac, gammachat, gammacvalid)
 
+
 # Compute gammahat.
 def get_gammahat(gamma_self, gamma):
     return gamma_self ** 3 / gamma ** 2
+
 
 # Compute Y Thomson given p, gammam and gammacs.
 def yt(params, gammam, gammacs):
@@ -309,6 +279,7 @@ def yt(params, gammam, gammacs):
         return array([YT for i in arange(len_q)]).transpose()
 
     return YT
+
 
 # Solves A7 by passing coeffs of A7 to cubic_formula()
 def YT_fast(params, gammam, gammacs):
