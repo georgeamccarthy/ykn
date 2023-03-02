@@ -39,46 +39,22 @@ def y(params, gammam, gammac, gammamhat, gammachat, gammae, YT, debug=False):
     # Compute Y for 6 orderings of the critical lorentz factors.
     Y[0] = YT
     Y[1] = YT * (gammae / gammamhat) ** (-1 / 2)
-    Y[2] = (YT * (gammac / gammam) * (gammae / gammachat)
-        ** (-4 / 3))
+    Y[2] = YT * (gammac / gammam) * (gammae / gammachat) ** (-4 / 3)
     Y[3] = YT
     Y[4] = YT * (gammae / gammachat) ** ((p - 3) / 2)
     Y[5] = (
-        YT
-        * (gammamhat / gammachat) ** ((p - 3) / 2)
-        * (gammae / gammamhat) ** (-4 / 3)
+        YT * (gammamhat / gammachat) ** ((p - 3) / 2) * (gammae / gammamhat) ** (-4 / 3)
     )
 
     # Compute boundaries for each of the 6 Y parameters.
     # Y_rules[i] = 1 where Y[i] has its conditions on the critical
     # lorentz factors satisfied.
-    Y_rules[0] = (
-    (gammac < gammam)
-    & (gammae < gammamhat)
-    )
-    Y_rules[1] = (
-        (gammac < gammam)
-        & (gammamhat < gammae)
-        & (gammae < gammachat)
-    )
-    Y_rules[2] = (
-        (gammac < gammam)
-        & (gammachat < gammae)
-    )
-    Y_rules[3] = (
-        (gammam < gammac)
-        & (gammae < gammachat)
-    )
-    Y_rules[4] = (
-        (gammam < gammac)
-        & (gammachat < gammae)
-        & (gammae < gammamhat)
-
-    )
-    Y_rules[5] = (
-        (gammam < gammac)
-        & (gammamhat < gammae)
-    )
+    Y_rules[0] = (gammac < gammam) & (gammae < gammamhat)
+    Y_rules[1] = (gammac < gammam) & (gammamhat < gammae) & (gammae < gammachat)
+    Y_rules[2] = (gammac < gammam) & (gammachat < gammae)
+    Y_rules[3] = (gammam < gammac) & (gammae < gammachat)
+    Y_rules[4] = (gammam < gammac) & (gammachat < gammae) & (gammae < gammamhat)
+    Y_rules[5] = (gammam < gammac) & (gammamhat < gammae)
 
     for i in arange(6):
         Y_valid[i] = Y[i] * Y_rules[i]
@@ -88,14 +64,7 @@ def y(params, gammam, gammac, gammamhat, gammachat, gammae, YT, debug=False):
     # Returns extra information for plotting, diagnostics and debugging if
     # debug parameter is true.
     if debug == True:
-        return (
-            Y_result,
-            Y,
-            Y_valid,
-            Y_rules,
-            gammac,
-            gammachat
-        )
+        return (Y_result, Y, Y_valid, Y_rules, gammac, gammachat)
 
     return Y_result
 
@@ -125,11 +94,11 @@ def yc_approx(params, gammam, gammacs, gamma_self, YT=None, debug=False):
             len_q = gammam.shape[1]
             # Slice gammas to 1D arrays because for Yc they are degenerate
             # in frequency.
-            gammam = gammam[:,0]
-            gammacs = gammacs[:,0]
-            gamma_self = gamma_self[:,0]
+            gammam = gammam[:, 0]
+            gammacs = gammacs[:, 0]
+            gamma_self = gamma_self[:, 0]
     else:
-        raise Warning('Unsupported types for one or more gamma arguments.')
+        raise Warning("Unsupported types for one or more gamma arguments.")
 
     # Save computation time by giving YT if you have already computed it.
     if YT is None:
@@ -151,21 +120,25 @@ def yc_approx(params, gammam, gammacs, gamma_self, YT=None, debug=False):
     Yc[0] = YT
     Yc[1] = YT ** 2 * (gammacs / gammamhat) ** -1
     # Alternate equation
-    #Yc[1] = YT ** (2/3) * (gammacs / gammamhat) ** (-1/3)
+    # Yc[1] = YT ** (2/3) * (gammacs / gammamhat) ** (-1/3)
     Yc[2] = YT * (gammacs / gammamhat) ** (-1 / 2)
     Yc[3] = YT * gammacs ** -1 * gammamhat ** (1 / 2)
     Yc[4] = YT
     inner_term = (
-        e_e / e_b
-        * 1 / (3 - p)
+        e_e
+        / e_b
+        * 1
+        / (3 - p)
         * (gammam / gammacs) ** (p - 2)
         * (gammacs / gammacshat) ** ((p - 3) / 2)
     )
     Yc[5] = inner_term ** (2 / (p - 1))
     Yc[6] = inner_term
     inner_term = (
-        e_e / e_b
-        * 1 / (3 - p)
+        e_e
+        / e_b
+        * 1
+        / (3 - p)
         * (gammam / gammamhat) ** (-4 / 3)
         * (gammam / gammacshat) ** (7 / 3)
     )
@@ -178,10 +151,7 @@ def yc_approx(params, gammam, gammacs, gamma_self, YT=None, debug=False):
         gammachat[i] = get_gammahat(gamma_self, gammac[i])
 
     # Yc_rules = 1 where each Yc obeys its own rules and = 0 where it does not.
-    Yc_rules[0] = (
-        (gammac[0] < gammam)
-        & (gammac[0] < gammamhat)
-    )
+    Yc_rules[0] = (gammac[0] < gammam) & (gammac[0] < gammamhat)
     Yc_rules[1] = (
         (gammac[1] < gammam)
         & (gammamhat < gammac[1])
@@ -194,15 +164,8 @@ def yc_approx(params, gammam, gammacs, gamma_self, YT=None, debug=False):
         & (gammac[2] < gammachat[2])
         & (Yc[2] < 1)
     )
-    Yc_rules[3] = (
-        (gammac[3] < gammam)
-        & (gammachat[3] < gammac[3])
-    )
-    Yc_rules[4] = (
-        (gammam < gammac[4])
-        & (gammac[4] < gammachat[4])
-        & (Yc[4] < 1)
-    )
+    Yc_rules[3] = (gammac[3] < gammam) & (gammachat[3] < gammac[3])
+    Yc_rules[4] = (gammam < gammac[4]) & (gammac[4] < gammachat[4]) & (Yc[4] < 1)
     Yc_rules[5] = (
         (gammam < gammac[5])
         & (gammachat[5] < gammac[5])
@@ -264,15 +227,14 @@ def yt(params, gammam, gammacs):
             dims = 2
             len_t = gammam.shape[0]
             len_q = gammam.shape[1]
-            gammam = gammam[:,0]
-            gammacs = gammacs[:,0]
+            gammam = gammam[:, 0]
+            gammacs = gammacs[:, 0]
 
     # Alpha as seen in JBH Eq.13 for smoothing.
     a = -60 * p ** -2
 
     YT = (
-        YT_fast(params, gammam, gammacs) ** a
-        + YT_slow(params, gammam, gammacs) ** a
+        YT_fast(params, gammam, gammacs) ** a + YT_slow(params, gammam, gammacs) ** a
     ) ** (1 / a)
 
     if dims == 2:
@@ -311,11 +273,13 @@ def cubic_formula(a, b, c, d):
 # in JBH Tab.2.
 def YT_slow(params, gammam, gammacs):
     p = params.p
-    # FIXME YMMV with this smoothing constant. 
+    # FIXME YMMV with this smoothing constant.
     # Works well for JBH Fig.1 & Fig.1 parameters.
-    a = - 1.7
-    return (YT_slow_approx(params, gammam, gammacs, 2) ** a +
-            YT_slow_approx(params, gammam, gammacs, 3) ** a) ** (1 / a)
+    a = -1.7
+    return (
+        YT_slow_approx(params, gammam, gammacs, 2) ** a
+        + YT_slow_approx(params, gammam, gammacs, 3) ** a
+    ) ** (1 / a)
 
 
 # Returns an approximation for Y_slow as given in table 2 of JBH.
@@ -324,28 +288,33 @@ def YT_slow_approx(params, gammam, gammacs, t_2_row):
     p = params.p
     E_ratio = params.e_e / params.e_b
     inner_term = E_ratio / (3 - p) * (gammam / gammacs) ** (p - 2)
-    #print(inner_term)
+    # print(inner_term)
     # Analytic solution gives approximation for large Y.
     if t_2_row == 2:
-        #print(1/(4-p))
-        #print(inner_term ** (1 / (4 - p)))
+        # print(1/(4-p))
+        # print(inner_term ** (1 / (4 - p)))
         return inner_term ** (1 / (4 - p))
     # Analytic solution gives approximation for small Y.
     elif t_2_row == 3:
         return inner_term
 
+
 # JBH A15 solved numerically for exact YT_slow.
 def YT_slow_exact(params, gammam, gammacs):
     from numpy import arange, zeros
     from scipy.optimize import fsolve
+
     p = params.p
     E_ratio = params.e_e / params.e_b
     YT = zeros(len(gammam))
 
     def A15(YT):
-        return (YT*(1 + YT) ** 2 * (p * (1 + YT) ** (1 - p) - gamma_m_over_cs ** (p - 1))
-                - p * E_ratio * (gamma_m_over_cs * (1 + YT) ** (3 - p) *
-                (p - 2)/(p - 3) + 1/(3 - p) * gamma_m_over_cs ** (p - 2)))
+        return YT * (1 + YT) ** 2 * (
+            p * (1 + YT) ** (1 - p) - gamma_m_over_cs ** (p - 1)
+        ) - p * E_ratio * (
+            gamma_m_over_cs * (1 + YT) ** (3 - p) * (p - 2) / (p - 3)
+            + 1 / (3 - p) * gamma_m_over_cs ** (p - 2)
+        )
 
     for i in arange(len(gammam)):
         starting_guess = YT_slow_approx(params, gammam[i], gammacs[i], 2)
@@ -354,16 +323,19 @@ def YT_slow_exact(params, gammam, gammacs):
 
     return YT
 
+
 # Y* as given in JBH A11
 def YT_transition(params):
     p = params.p
     E_ratio = params.e_e / params.e_b
     return ((1 + 4 * p / (p - 1) * E_ratio) ** (1 / 2) - 1) / 2
 
+
 # Computes the transition time between fast and slow regimes in the Thomson
 # regime. Useful for plotting.
 def fs_transtime(params, gammam, gammacs, t):
     from numpy import where
+
     YTfast = YT_fast(params, gammam, gammacs)
     valid_slow = where(YTfast < YT_transition(params))
     transtime_index = max(valid_slow[0])
