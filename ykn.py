@@ -195,6 +195,10 @@ def yc_approx(params, gammam, gammacs, gamma_self, YT=None, debug=False):
         Yc_valid[i] = Yc[i] * Yc_rules[i]
         Yc_result = Yc_result + Yc_valid[i]
 
+    # Prevents any Yc > YT (otherwise this can occur over a small window due to
+    # slightly different normalization between ykn.yc_approx and ykn.yt).
+    Yc_result[Yc_result > YT] = 0
+
     # Fills gaps between valid regions with Y Thomson.
     Yc_result = Yc_result + (Yc_result == 0) * YT
 
