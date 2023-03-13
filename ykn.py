@@ -97,6 +97,8 @@ def yc_approx(params, gammam, gammacs, gamma_self, YT=None, debug=False):
             gammam = gammam[:, 0]
             gammacs = gammacs[:, 0]
             gamma_self = gamma_self[:, 0]
+            if YT is not None and YT.ndim == 2:
+                YT = YT[:, 0]
     else:
         raise Warning("Unsupported types for one or more gamma arguments.")
 
