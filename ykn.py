@@ -129,7 +129,7 @@ def yc_approx(params, gammam, gammacs, gamma_self, YT=None, debug=False):
     inner_term = (
         e_e
         / e_b
-        * 1
+        * (p - 2)
         / (3 - p)
         * (gammam / gammacs) ** (p - 2)
         * (gammacs / gammacshat) ** ((p - 3) / 2)
