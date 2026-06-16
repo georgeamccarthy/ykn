@@ -110,13 +110,7 @@ def yc_approx(params, gammam, gammacs, gamma_self, YT=None, debug=False):
     gammacshat = get_gammahat(gamma_self, gammacs)
 
     nineshape = (9, len_t)
-    yc_shape = len_t
     Yc = zeros(nineshape)
-    Yc_valid = zeros(nineshape)
-    gammac = zeros(nineshape)
-    gammachat = zeros(nineshape)
-    Yc_rules = zeros(nineshape)
-    Yc_result = zeros(yc_shape)
 
     # Compute Yc in each functional regime.
     Yc[0] = YT
@@ -147,72 +141,32 @@ def yc_approx(params, gammam, gammacs, gamma_self, YT=None, debug=False):
     Yc[7] = inner_term ** (3 / 7)
     Yc[8] = inner_term
 
-    # For each Yc compute the corresponding gammac and gammachat
-    for i in arange(len(Yc)):
-        gammac[i] = gammacs / (1 + Yc[i])
-        gammachat[i] = get_gammahat(gamma_self, gammac[i])
-
-    # Yc_rules = 1 where each Yc obeys its own rules and = 0 where it does not.
-    Yc_rules[0] = (gammac[0] < gammam) & (gammac[0] < gammamhat)
-    Yc_rules[1] = (
-        (gammac[1] < gammam)
-        & (gammamhat < gammac[1])
-        & (gammac[1] < gammachat[1])
-        & (Yc[1] >= 1)
-    )
-    Yc_rules[2] = (
-        (gammac[2] < gammam)
-        & (gammamhat < gammac[2])
-        & (gammac[2] < gammachat[2])
-        & (Yc[2] < 1)
-    )
-    Yc_rules[3] = (gammac[3] < gammam) & (gammachat[3] < gammac[3])
-    Yc_rules[4] = (gammam < gammac[4]) & (gammac[4] < gammachat[4]) & (Yc[4] < 1)
-    Yc_rules[5] = (
-        (gammam < gammac[5])
-        & (gammachat[5] < gammac[5])
-        & (gammac[5] < gammamhat)
-        & (Yc[5] >= 1)
-    )
-    Yc_rules[6] = (
-        (gammam < gammac[6])
-        & (gammachat[6] < gammac[6])
-        & (gammac[6] < gammamhat)
-        & (Yc[6] < 1)
-    )
-    Yc_rules[7] = (
-        (gammam < gammac[7])
-        & (gammachat[7] < gammamhat)
-        & (gammamhat < gammac[7])
-        & (Yc[7] >= 1)
-    )
-    Yc_rules[8] = (
-        (gammam < gammac[8])
-        & (gammachat[8] < gammamhat)
-        & (gammamhat < gammac[8])
-        & (Yc[8] < 1)
-    )
-
-    for i in arange(9):
-        Yc_valid[i] = Yc[i] * Yc_rules[i]
+    # gammac, gammachat across all 9 regimes in two broadcast ops.
+    gammac    = gammacs / (1 + Yc)
+    gammachat = get_gammahat(gamma_self, gammac)
 
     # Smooth regime blending.
-    # The boolean Yc_rules above flip discretely at regime boundaries
-    # (and Yc[i] does not in general equal YT at the boundary), so the
-    # gap-fill `(Yc_result==0)*YT` joins discontinuously. That step is
-    # what propagates into every f_b(Yc) and shows up as a temporal kink
-    # in lightcurves. Replace the hard rule selection with a smooth
+    # The original code picked one Yc[i] per t with a discrete rule then
+    # filled gaps with YT; that gap-fill joined discontinuously because
+    # Yc[i] is not in general equal to YT at the regime boundary. The
+    # discontinuity propagates into every f_b(Yc) as a temporal kink in
+    # the lightcurve. Replace the hard rule selection with a smooth
     # indicator on each strict inequality:
     #     soft_lt(a, b) = 1 / (1 + (a / b)**s)   (~ 1{a < b})
-    # so each rule weight w[i] is a smooth product over its inequalities.
-    # YT fills any leftover weight (gap); a final soft-min with YT
-    # preserves the original Yc <= YT cap.
+    # so each regime weight w[i] is a smooth product over its
+    # inequalities. YT picks up any leftover weight; a final soft-min
+    # with YT preserves the original Yc <= YT cap.
+    #
+    # `(a/b)**5` is computed as r=a/b; r4=(r*r)**2; r4*r — three
+    # multiplications instead of NumPy's generic `**`, which is ~5x
+    # faster on big arrays and dominates yc_approx's runtime.
     from numpy import maximum
 
-    s_smooth = 5.0
-
     def _soft_lt(a, b):
-        return 1.0 / (1.0 + (a / b) ** s_smooth)
+        r = a / b
+        r2 = r * r
+        r4 = r2 * r2
+        return 1.0 / (1.0 + r4 * r)
 
     one = 1.0
     w_smooth = zeros(nineshape)
@@ -261,6 +215,49 @@ def yc_approx(params, gammam, gammacs, gamma_self, YT=None, debug=False):
         if dims == 2:
             return array([Yc_result for i in arange(len_q)]).transpose()
         return Yc_result
+
+    # debug path needs the hard-rule arrays for diagnostics
+    Yc_rules = zeros(nineshape)
+    Yc_rules[0] = (gammac[0] < gammam) & (gammac[0] < gammamhat)
+    Yc_rules[1] = (
+        (gammac[1] < gammam)
+        & (gammamhat < gammac[1])
+        & (gammac[1] < gammachat[1])
+        & (Yc[1] >= 1)
+    )
+    Yc_rules[2] = (
+        (gammac[2] < gammam)
+        & (gammamhat < gammac[2])
+        & (gammac[2] < gammachat[2])
+        & (Yc[2] < 1)
+    )
+    Yc_rules[3] = (gammac[3] < gammam) & (gammachat[3] < gammac[3])
+    Yc_rules[4] = (gammam < gammac[4]) & (gammac[4] < gammachat[4]) & (Yc[4] < 1)
+    Yc_rules[5] = (
+        (gammam < gammac[5])
+        & (gammachat[5] < gammac[5])
+        & (gammac[5] < gammamhat)
+        & (Yc[5] >= 1)
+    )
+    Yc_rules[6] = (
+        (gammam < gammac[6])
+        & (gammachat[6] < gammac[6])
+        & (gammac[6] < gammamhat)
+        & (Yc[6] < 1)
+    )
+    Yc_rules[7] = (
+        (gammam < gammac[7])
+        & (gammachat[7] < gammamhat)
+        & (gammamhat < gammac[7])
+        & (Yc[7] >= 1)
+    )
+    Yc_rules[8] = (
+        (gammam < gammac[8])
+        & (gammachat[8] < gammamhat)
+        & (gammamhat < gammac[8])
+        & (Yc[8] < 1)
+    )
+    Yc_valid = Yc * Yc_rules
 
     if debug == True:
         gammacvalid = zeros(shape=(9, len_t))
