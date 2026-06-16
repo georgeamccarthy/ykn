@@ -145,24 +145,20 @@ def yc_approx(params, gammam, gammacs, gamma_self, YT=None, debug=False):
     gammac    = gammacs / (1 + Yc)
     gammachat = get_gammahat(gamma_self, gammac)
 
-    # Smooth regime blending.
-    # The original code picked one Yc[i] per t with a discrete rule then
-    # filled gaps with YT; that gap-fill joined discontinuously because
-    # Yc[i] is not in general equal to YT at the regime boundary. The
-    # discontinuity propagates into every f_b(Yc) as a temporal kink in
-    # the lightcurve. Replace the hard rule selection with a smooth
-    # indicator on each strict inequality:
-    #     soft_lt(a, b) = 1 / (1 + (a / b)**s)   (~ 1{a < b})
-    # so each regime weight w[i] is a smooth product over its
-    # inequalities. YT picks up any leftover weight; a final soft-min
-    # with YT preserves the original Yc <= YT cap.
-    #
-    # `(a/b)**5` is computed as r=a/b; r4=(r*r)**2; r4*r — three
-    # multiplications instead of NumPy's generic `**`, which is ~5x
-    # faster on big arrays and dominates yc_approx's runtime.
+    # Combine the 9 candidate Yc values into a single Yc(t) by weighting
+    # each regime by the product of soft indicators on the strict
+    # inequalities that define it. YT picks up any leftover weight; a
+    # final soft-min with YT keeps Yc <= YT.
     from numpy import maximum
 
-    def _soft_lt(a, b):
+    def _less_than(a, b):
+        # Smooth indicator for `a < b`: ~1 when a << b, ~0 when a >> b,
+        # 0.5 at a = b. The functional form is 1 / (1 + (a/b)**5), with
+        # s = 5 setting how sharply the indicator transitions; this is
+        # the same sigmoid family Granot & Sari (2002) use to soften the
+        # break frequencies. Hardcoding the power as
+        #   r = a/b ; r^5 = (r * r)^2 * r
+        # is ~5x faster than NumPy's generic `**` on large arrays.
         r = a / b
         r2 = r * r
         r4 = r2 * r2
@@ -170,44 +166,55 @@ def yc_approx(params, gammam, gammacs, gamma_self, YT=None, debug=False):
 
     one = 1.0
     w_smooth = zeros(nineshape)
-    w_smooth[0] = (_soft_lt(gammac[0], gammam)
-                   * _soft_lt(gammac[0], gammamhat))
-    w_smooth[1] = (_soft_lt(gammac[1], gammam)
-                   * _soft_lt(gammamhat, gammac[1])
-                   * _soft_lt(gammac[1], gammachat[1])
-                   * _soft_lt(one, Yc[1]))
-    w_smooth[2] = (_soft_lt(gammac[2], gammam)
-                   * _soft_lt(gammamhat, gammac[2])
-                   * _soft_lt(gammac[2], gammachat[2])
-                   * _soft_lt(Yc[2], one))
-    w_smooth[3] = (_soft_lt(gammac[3], gammam)
-                   * _soft_lt(gammachat[3], gammac[3]))
-    w_smooth[4] = (_soft_lt(gammam, gammac[4])
-                   * _soft_lt(gammac[4], gammachat[4])
-                   * _soft_lt(Yc[4], one))
-    w_smooth[5] = (_soft_lt(gammam, gammac[5])
-                   * _soft_lt(gammachat[5], gammac[5])
-                   * _soft_lt(gammac[5], gammamhat)
-                   * _soft_lt(one, Yc[5]))
-    w_smooth[6] = (_soft_lt(gammam, gammac[6])
-                   * _soft_lt(gammachat[6], gammac[6])
-                   * _soft_lt(gammac[6], gammamhat)
-                   * _soft_lt(Yc[6], one))
-    w_smooth[7] = (_soft_lt(gammam, gammac[7])
-                   * _soft_lt(gammachat[7], gammamhat)
-                   * _soft_lt(gammamhat, gammac[7])
-                   * _soft_lt(one, Yc[7]))
-    w_smooth[8] = (_soft_lt(gammam, gammac[8])
-                   * _soft_lt(gammachat[8], gammamhat)
-                   * _soft_lt(gammamhat, gammac[8])
-                   * _soft_lt(Yc[8], one))
+    w_smooth[0] = (_less_than(gammac[0], gammam)
+                   * _less_than(gammac[0], gammamhat))
+    w_smooth[1] = (_less_than(gammac[1], gammam)
+                   * _less_than(gammamhat, gammac[1])
+                   * _less_than(gammac[1], gammachat[1])
+                   * _less_than(one, Yc[1]))
+    w_smooth[2] = (_less_than(gammac[2], gammam)
+                   * _less_than(gammamhat, gammac[2])
+                   * _less_than(gammac[2], gammachat[2])
+                   * _less_than(Yc[2], one))
+    w_smooth[3] = (_less_than(gammac[3], gammam)
+                   * _less_than(gammachat[3], gammac[3]))
+    w_smooth[4] = (_less_than(gammam, gammac[4])
+                   * _less_than(gammac[4], gammachat[4])
+                   * _less_than(Yc[4], one))
+    w_smooth[5] = (_less_than(gammam, gammac[5])
+                   * _less_than(gammachat[5], gammac[5])
+                   * _less_than(gammac[5], gammamhat)
+                   * _less_than(one, Yc[5]))
+    w_smooth[6] = (_less_than(gammam, gammac[6])
+                   * _less_than(gammachat[6], gammac[6])
+                   * _less_than(gammac[6], gammamhat)
+                   * _less_than(Yc[6], one))
+    w_smooth[7] = (_less_than(gammam, gammac[7])
+                   * _less_than(gammachat[7], gammamhat)
+                   * _less_than(gammamhat, gammac[7])
+                   * _less_than(one, Yc[7]))
+    w_smooth[8] = (_less_than(gammam, gammac[8])
+                   * _less_than(gammachat[8], gammamhat)
+                   * _less_than(gammamhat, gammac[8])
+                   * _less_than(Yc[8], one))
 
+    # sum along axis 0 collapses the 9 regimes into per-t totals.
+    # w_sum[t]   = total weight assigned to the 9 analytic regimes at time t.
+    # yt_weight  = the leftover, capped at 0 so it never goes negative when
+    #              the 9 regime weights slightly overshoot 1 near a boundary.
+    # denom normalises so a uniform shift in the weights doesn't bias Yc_result.
     w_sum = w_smooth.sum(axis=0)
     yt_weight = maximum(1.0 - w_sum, 0.0)
     denom = w_sum + yt_weight
     Yc_result = ((w_smooth * Yc).sum(axis=0) + yt_weight * YT) / denom
 
-    # Soft cap at YT (smooth replacement for `Yc_result[Yc_result>YT]=0`).
+    # Soft-min cap to enforce Yc <= YT. The combiner
+    #   (x^a + y^a)^(1/a)
+    # approaches min(x, y) for a -> -infinity and matches it everywhere
+    # outside a narrow window around x = y. a = -60/p^2 is the smoothing
+    # exponent Jacovich, Beniamini & van der Horst (JBH) Eq. 13 use to
+    # blend the fast- and slow-cooling YT branches; reusing it here keeps
+    # the cap's transition width consistent with the rest of yt().
     a_cap = -60.0 / p ** 2
     Yc_result = (Yc_result ** a_cap + YT ** a_cap) ** (1.0 / a_cap)
 
