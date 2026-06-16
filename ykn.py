@@ -150,11 +150,15 @@ def yc_approx(params, gammam, gammacs, gamma_self, YT=None, debug=False):
     # inequalities that define it. YT picks up any leftover weight; a
     # final soft-min with YT keeps Yc <= YT.
 
-    # Smoothing sharpness exponent. Matches `pl = 2` used by realspectra
-    # for the time-domain GS-regime blending and by knspectrum for KN
-    # sub-spectrum branch selection, so the same transition width applies
-    # everywhere a smoothed `a < b` shows up in the pipeline.
-    pl = 2
+    # Smoothing sharpness exponent. realspectra uses pl = 2 for the
+    # time-domain GS-regime blending and knspectrum uses the same for
+    # KN sub-spectrum branch selection. Here we use a sharper pl = 5
+    # because the 9 analytic Yc candidates can sit many orders of
+    # magnitude apart: a regime whose strict-< inequalities are only
+    # partially satisfied still leaks a non-trivial weight under pl = 2,
+    # and an off-regime Yc that's tiny then drags the weighted average
+    # away from YT. pl = 5 drops off-regime weights to ~10^-3.
+    pl = 5
 
     def _less_than(a, b):
         # Smooth indicator for `a < b`: ~1 when a << b, ~0 when a >> b,
@@ -195,6 +199,16 @@ def yc_approx(params, gammam, gammacs, gamma_self, YT=None, debug=False):
                    * _less_than(gammachat[8], gammamhat)
                    * _less_than(gammamhat, gammac[8])
                    * _less_than(Yc[8], one))
+
+    # Plausibility gate: a regime is only believed if its analytic
+    # Yc[i] value sits in the physically sensible range — positive,
+    # not many orders of magnitude above YT, not vanishingly small.
+    # Without this, a regime whose geometric ordering happens to hold
+    # by accident can fire with a nonsense Yc value (e.g. regime 3
+    # producing Yc ~ 1e-5 at t ~ 1e-6 d for some param sets) and pull
+    # the smoothed Yc result with it.
+    plausible = _less_than(Yc, 10.0 * YT) * _less_than(1e-3, Yc)
+    w_smooth = w_smooth * plausible
 
     # sum along axis 0 collapses the 9 regimes into per-t totals;
     # w_sum[t] is the total weight assigned at time t. Normalising by
