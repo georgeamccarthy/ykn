@@ -149,7 +149,6 @@ def yc_approx(params, gammam, gammacs, gamma_self, YT=None, debug=False):
     # each regime by the product of soft indicators on the strict
     # inequalities that define it. YT picks up any leftover weight; a
     # final soft-min with YT keeps Yc <= YT.
-    from numpy import maximum
 
     # Smoothing sharpness exponent. Matches `pl = 2` used by realspectra
     # for the time-domain GS-regime blending and by knspectrum for KN
@@ -160,10 +159,8 @@ def yc_approx(params, gammam, gammacs, gamma_self, YT=None, debug=False):
     def _less_than(a, b):
         # Smooth indicator for `a < b`: ~1 when a << b, ~0 when a >> b,
         # 0.5 at a = b. The form 1 / (1 + (a/b)**pl) is the Granot &
-        # Sari (2002) sigmoid; with pl = 2 we hardcode the power as one
-        # multiplication (faster than NumPy's generic `**`).
-        r = a / b
-        return 1.0 / (1.0 + r * r)
+        # Sari (2002) sigmoid.
+        return 1.0 / (1.0 + (a / b) ** pl)
 
     one = 1.0
     w_smooth = zeros(nineshape)
@@ -199,15 +196,18 @@ def yc_approx(params, gammam, gammacs, gamma_self, YT=None, debug=False):
                    * _less_than(gammamhat, gammac[8])
                    * _less_than(Yc[8], one))
 
-    # sum along axis 0 collapses the 9 regimes into per-t totals.
-    # w_sum[t]   = total weight assigned to the 9 analytic regimes at time t.
-    # yt_weight  = the leftover, capped at 0 so it never goes negative when
-    #              the 9 regime weights slightly overshoot 1 near a boundary.
-    # denom normalises so a uniform shift in the weights doesn't bias Yc_result.
+    # sum along axis 0 collapses the 9 regimes into per-t totals;
+    # w_sum[t] is the total weight assigned at time t. Normalising by
+    # w_sum gives the regimes' weighted average Yc. YT is added only as
+    # a strict gap-filler — `gap` becomes ~1 only when w_sum drops to
+    # zero (no regime fits), so well-covered points get the regime
+    # average without YT bias. Without the gap test, a few percent of
+    # leftover weight times a huge YT would dominate the answer wherever
+    # YT >> Yc.
     w_sum = w_smooth.sum(axis=0)
-    yt_weight = maximum(1.0 - w_sum, 0.0)
-    denom = w_sum + yt_weight
-    Yc_result = ((w_smooth * Yc).sum(axis=0) + yt_weight * YT) / denom
+    gap = _less_than(w_sum, 0.01)
+    denom = w_sum + gap
+    Yc_result = ((w_smooth * Yc).sum(axis=0) + gap * YT) / denom
 
     # Soft-min cap to enforce Yc <= YT. The combiner
     #   (x^a + y^a)^(1/a)
