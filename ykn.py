@@ -151,18 +151,19 @@ def yc_approx(params, gammam, gammacs, gamma_self, YT=None, debug=False):
     # final soft-min with YT keeps Yc <= YT.
     from numpy import maximum
 
+    # Smoothing sharpness exponent. Matches `pl = 2` used by realspectra
+    # for the time-domain GS-regime blending and by knspectrum for KN
+    # sub-spectrum branch selection, so the same transition width applies
+    # everywhere a smoothed `a < b` shows up in the pipeline.
+    pl = 2
+
     def _less_than(a, b):
         # Smooth indicator for `a < b`: ~1 when a << b, ~0 when a >> b,
-        # 0.5 at a = b. The functional form is 1 / (1 + (a/b)**5), with
-        # s = 5 setting how sharply the indicator transitions; this is
-        # the same sigmoid family Granot & Sari (2002) use to soften the
-        # break frequencies. Hardcoding the power as
-        #   r = a/b ; r^5 = (r * r)^2 * r
-        # is ~5x faster than NumPy's generic `**` on large arrays.
+        # 0.5 at a = b. The form 1 / (1 + (a/b)**pl) is the Granot &
+        # Sari (2002) sigmoid; with pl = 2 we hardcode the power as one
+        # multiplication (faster than NumPy's generic `**`).
         r = a / b
-        r2 = r * r
-        r4 = r2 * r2
-        return 1.0 / (1.0 + r4 * r)
+        return 1.0 / (1.0 + r * r)
 
     one = 1.0
     w_smooth = zeros(nineshape)
