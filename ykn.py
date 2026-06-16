@@ -201,20 +201,18 @@ def yc_approx(params, gammam, gammacs, gamma_self, YT=None, debug=False):
     # (and Yc[i] does not in general equal YT at the boundary), so the
     # gap-fill `(Yc_result==0)*YT` joins discontinuously. That step is
     # what propagates into every f_b(Yc) and shows up as a temporal kink
-    # in lightcurves. Replace the hard rule selection with JBH-style
-    # smooth indicators on each strict inequality:
-    #     soft_lt(a, b) = sigmoid(s * log(b/a))   (~ 1{a < b})
+    # in lightcurves. Replace the hard rule selection with a smooth
+    # indicator on each strict inequality:
+    #     soft_lt(a, b) = 1 / (1 + (a / b)**s)   (~ 1{a < b})
     # so each rule weight w[i] is a smooth product over its inequalities.
     # YT fills any leftover weight (gap); a final soft-min with YT
     # preserves the original Yc <= YT cap.
-    from numpy import tanh, log, clip, maximum
+    from numpy import maximum
 
     s_smooth = 5.0
 
     def _soft_lt(a, b):
-        delta = s_smooth * (log(clip(b, 1e-300, None))
-                            - log(clip(a, 1e-300, None)))
-        return 0.5 * (1.0 + tanh(0.5 * delta))
+        return 1.0 / (1.0 + (a / b) ** s_smooth)
 
     one = 1.0
     w_smooth = zeros(nineshape)
