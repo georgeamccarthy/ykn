@@ -195,14 +195,69 @@ def yc_approx(params, gammam, gammacs, gamma_self, YT=None, debug=False):
 
     for i in arange(9):
         Yc_valid[i] = Yc[i] * Yc_rules[i]
-        Yc_result = Yc_result + Yc_valid[i]
 
-    # Prevents any Yc > YT (otherwise this can occur over a small window due to
-    # slightly different normalization between ykn.yc_approx and ykn.yt).
-    Yc_result[Yc_result > YT] = 0
+    # Smooth regime blending.
+    # The boolean Yc_rules above flip discretely at regime boundaries
+    # (and Yc[i] does not in general equal YT at the boundary), so the
+    # gap-fill `(Yc_result==0)*YT` joins discontinuously. That step is
+    # what propagates into every f_b(Yc) and shows up as a temporal kink
+    # in lightcurves. Replace the hard rule selection with JBH-style
+    # smooth indicators on each strict inequality:
+    #     soft_lt(a, b) = sigmoid(s * log(b/a))   (~ 1{a < b})
+    # so each rule weight w[i] is a smooth product over its inequalities.
+    # YT fills any leftover weight (gap); a final soft-min with YT
+    # preserves the original Yc <= YT cap.
+    from numpy import tanh, log, clip, maximum
 
-    # Fills gaps between valid regions with Y Thomson.
-    Yc_result = Yc_result + (Yc_result == 0) * YT
+    s_smooth = 5.0
+
+    def _soft_lt(a, b):
+        delta = s_smooth * (log(clip(b, 1e-300, None))
+                            - log(clip(a, 1e-300, None)))
+        return 0.5 * (1.0 + tanh(0.5 * delta))
+
+    one = 1.0
+    w_smooth = zeros(nineshape)
+    w_smooth[0] = (_soft_lt(gammac[0], gammam)
+                   * _soft_lt(gammac[0], gammamhat))
+    w_smooth[1] = (_soft_lt(gammac[1], gammam)
+                   * _soft_lt(gammamhat, gammac[1])
+                   * _soft_lt(gammac[1], gammachat[1])
+                   * _soft_lt(one, Yc[1]))
+    w_smooth[2] = (_soft_lt(gammac[2], gammam)
+                   * _soft_lt(gammamhat, gammac[2])
+                   * _soft_lt(gammac[2], gammachat[2])
+                   * _soft_lt(Yc[2], one))
+    w_smooth[3] = (_soft_lt(gammac[3], gammam)
+                   * _soft_lt(gammachat[3], gammac[3]))
+    w_smooth[4] = (_soft_lt(gammam, gammac[4])
+                   * _soft_lt(gammac[4], gammachat[4])
+                   * _soft_lt(Yc[4], one))
+    w_smooth[5] = (_soft_lt(gammam, gammac[5])
+                   * _soft_lt(gammachat[5], gammac[5])
+                   * _soft_lt(gammac[5], gammamhat)
+                   * _soft_lt(one, Yc[5]))
+    w_smooth[6] = (_soft_lt(gammam, gammac[6])
+                   * _soft_lt(gammachat[6], gammac[6])
+                   * _soft_lt(gammac[6], gammamhat)
+                   * _soft_lt(Yc[6], one))
+    w_smooth[7] = (_soft_lt(gammam, gammac[7])
+                   * _soft_lt(gammachat[7], gammamhat)
+                   * _soft_lt(gammamhat, gammac[7])
+                   * _soft_lt(one, Yc[7]))
+    w_smooth[8] = (_soft_lt(gammam, gammac[8])
+                   * _soft_lt(gammachat[8], gammamhat)
+                   * _soft_lt(gammamhat, gammac[8])
+                   * _soft_lt(Yc[8], one))
+
+    w_sum = w_smooth.sum(axis=0)
+    yt_weight = maximum(1.0 - w_sum, 0.0)
+    denom = w_sum + yt_weight
+    Yc_result = ((w_smooth * Yc).sum(axis=0) + yt_weight * YT) / denom
+
+    # Soft cap at YT (smooth replacement for `Yc_result[Yc_result>YT]=0`).
+    a_cap = -60.0 / p ** 2
+    Yc_result = (Yc_result ** a_cap + YT ** a_cap) ** (1.0 / a_cap)
 
     if debug == False:
         if dims == 2:
