@@ -110,13 +110,7 @@ def yc_approx(params, gammam, gammacs, gamma_self, YT=None, debug=False):
     gammacshat = get_gammahat(gamma_self, gammacs)
 
     nineshape = (9, len_t)
-    yc_shape = len_t
     Yc = zeros(nineshape)
-    Yc_valid = zeros(nineshape)
-    gammac = zeros(nineshape)
-    gammachat = zeros(nineshape)
-    Yc_rules = zeros(nineshape)
-    Yc_result = zeros(yc_shape)
 
     # Compute Yc in each functional regime.
     Yc[0] = YT
@@ -147,12 +141,105 @@ def yc_approx(params, gammam, gammacs, gamma_self, YT=None, debug=False):
     Yc[7] = inner_term ** (3 / 7)
     Yc[8] = inner_term
 
-    # For each Yc compute the corresponding gammac and gammachat
-    for i in arange(len(Yc)):
-        gammac[i] = gammacs / (1 + Yc[i])
-        gammachat[i] = get_gammahat(gamma_self, gammac[i])
+    # gammac, gammachat across all 9 regimes in two broadcast ops.
+    gammac    = gammacs / (1 + Yc)
+    gammachat = get_gammahat(gamma_self, gammac)
 
-    # Yc_rules = 1 where each Yc obeys its own rules and = 0 where it does not.
+    # Combine the 9 candidate Yc values into a single Yc(t) by weighting
+    # each regime by the product of soft indicators on the strict
+    # inequalities that define it. YT picks up any leftover weight; a
+    # final soft-min with YT keeps Yc <= YT.
+
+    # Smoothing sharpness exponent. realspectra uses pl = 2 for the
+    # time-domain GS-regime blending and knspectrum uses the same for
+    # KN sub-spectrum branch selection. Here we use a sharper pl = 5
+    # because the 9 analytic Yc candidates can sit many orders of
+    # magnitude apart: a regime whose strict-< inequalities are only
+    # partially satisfied still leaks a non-trivial weight under pl = 2,
+    # and an off-regime Yc that's tiny then drags the weighted average
+    # away from YT. pl = 5 drops off-regime weights to ~10^-3.
+    pl = 5
+
+    def _less_than(a, b):
+        # Smooth indicator for `a < b`: ~1 when a << b, ~0 when a >> b,
+        # 0.5 at a = b. The form 1 / (1 + (a/b)**pl) is the Granot &
+        # Sari (2002) sigmoid.
+        return 1.0 / (1.0 + (a / b) ** pl)
+
+    one = 1.0
+    w_smooth = zeros(nineshape)
+    w_smooth[0] = (_less_than(gammac[0], gammam)
+                   * _less_than(gammac[0], gammamhat))
+    w_smooth[1] = (_less_than(gammac[1], gammam)
+                   * _less_than(gammamhat, gammac[1])
+                   * _less_than(gammac[1], gammachat[1])
+                   * _less_than(one, Yc[1]))
+    w_smooth[2] = (_less_than(gammac[2], gammam)
+                   * _less_than(gammamhat, gammac[2])
+                   * _less_than(gammac[2], gammachat[2])
+                   * _less_than(Yc[2], one))
+    w_smooth[3] = (_less_than(gammac[3], gammam)
+                   * _less_than(gammachat[3], gammac[3]))
+    w_smooth[4] = (_less_than(gammam, gammac[4])
+                   * _less_than(gammac[4], gammachat[4])
+                   * _less_than(Yc[4], one))
+    w_smooth[5] = (_less_than(gammam, gammac[5])
+                   * _less_than(gammachat[5], gammac[5])
+                   * _less_than(gammac[5], gammamhat)
+                   * _less_than(one, Yc[5]))
+    w_smooth[6] = (_less_than(gammam, gammac[6])
+                   * _less_than(gammachat[6], gammac[6])
+                   * _less_than(gammac[6], gammamhat)
+                   * _less_than(Yc[6], one))
+    w_smooth[7] = (_less_than(gammam, gammac[7])
+                   * _less_than(gammachat[7], gammamhat)
+                   * _less_than(gammamhat, gammac[7])
+                   * _less_than(one, Yc[7]))
+    w_smooth[8] = (_less_than(gammam, gammac[8])
+                   * _less_than(gammachat[8], gammamhat)
+                   * _less_than(gammamhat, gammac[8])
+                   * _less_than(Yc[8], one))
+
+    # Plausibility gate: a regime is only believed if its analytic
+    # Yc[i] value sits in the physically sensible range — positive,
+    # not many orders of magnitude above YT, not vanishingly small.
+    # Without this, a regime whose geometric ordering happens to hold
+    # by accident can fire with a nonsense Yc value (e.g. regime 3
+    # producing Yc ~ 1e-5 at t ~ 1e-6 d for some param sets) and pull
+    # the smoothed Yc result with it.
+    plausible = _less_than(Yc, 10.0 * YT) * _less_than(1e-3, Yc)
+    w_smooth = w_smooth * plausible
+
+    # sum along axis 0 collapses the 9 regimes into per-t totals;
+    # w_sum[t] is the total weight assigned at time t. Normalising by
+    # w_sum gives the regimes' weighted average Yc. YT is added only as
+    # a strict gap-filler — `gap` becomes ~1 only when w_sum drops to
+    # zero (no regime fits), so well-covered points get the regime
+    # average without YT bias. Without the gap test, a few percent of
+    # leftover weight times a huge YT would dominate the answer wherever
+    # YT >> Yc.
+    w_sum = w_smooth.sum(axis=0)
+    gap = _less_than(w_sum, 0.01)
+    denom = w_sum + gap
+    Yc_result = ((w_smooth * Yc).sum(axis=0) + gap * YT) / denom
+
+    # Soft-min cap to enforce Yc <= YT. The combiner
+    #   (x^a + y^a)^(1/a)
+    # approaches min(x, y) for a -> -infinity and matches it everywhere
+    # outside a narrow window around x = y. a = -60/p^2 is the smoothing
+    # exponent Jacovich, Beniamini & van der Horst (JBH) Eq. 13 use to
+    # blend the fast- and slow-cooling YT branches; reusing it here keeps
+    # the cap's transition width consistent with the rest of yt().
+    a_cap = -60.0 / p ** 2
+    Yc_result = (Yc_result ** a_cap + YT ** a_cap) ** (1.0 / a_cap)
+
+    if debug == False:
+        if dims == 2:
+            return array([Yc_result for i in arange(len_q)]).transpose()
+        return Yc_result
+
+    # debug path needs the hard-rule arrays for diagnostics
+    Yc_rules = zeros(nineshape)
     Yc_rules[0] = (gammac[0] < gammam) & (gammac[0] < gammamhat)
     Yc_rules[1] = (
         (gammac[1] < gammam)
@@ -192,22 +279,7 @@ def yc_approx(params, gammam, gammacs, gamma_self, YT=None, debug=False):
         & (gammamhat < gammac[8])
         & (Yc[8] < 1)
     )
-
-    for i in arange(9):
-        Yc_valid[i] = Yc[i] * Yc_rules[i]
-        Yc_result = Yc_result + Yc_valid[i]
-
-    # Prevents any Yc > YT (otherwise this can occur over a small window due to
-    # slightly different normalization between ykn.yc_approx and ykn.yt).
-    Yc_result[Yc_result > YT] = 0
-
-    # Fills gaps between valid regions with Y Thomson.
-    Yc_result = Yc_result + (Yc_result == 0) * YT
-
-    if debug == False:
-        if dims == 2:
-            return array([Yc_result for i in arange(len_q)]).transpose()
-        return Yc_result
+    Yc_valid = Yc * Yc_rules
 
     if debug == True:
         gammacvalid = zeros(shape=(9, len_t))
